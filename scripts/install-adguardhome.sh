@@ -46,6 +46,14 @@ else
   chmod +x "$INSTALL_DIR/AdGuardHome"
 fi
 
+echo "==> Garantindo que o supervisor de serviços (runsvdir) está ativo..."
+export SVDIR="$PREFIX/var/service"
+export LOGDIR="$PREFIX/var/log"
+if ! pgrep -f "runsvdir $SVDIR" >/dev/null 2>&1; then
+  "$PREFIX/bin/service-daemon" start || true
+  sleep 2
+fi
+
 echo "==> Criando serviço para o termux-services (mantém rodando e reinicia sozinho)..."
 mkdir -p "$SERVICE_DIR/log"
 
@@ -64,9 +72,30 @@ EOF
 chmod +x "$SERVICE_DIR/log/run"
 mkdir -p "$INSTALL_DIR/logs"
 
-echo "==> Habilitando e iniciando o serviço..."
-sv-enable adguardhome
-sv up adguardhome
+echo "==> Aguardando o supervisor reconhecer o novo serviço..."
+for i in $(seq 1 15); do
+  [ -d "$SERVICE_DIR/supervise" ] && break
+  sleep 1
+done
+
+if [ ! -d "$SERVICE_DIR/supervise" ]; then
+  cat <<'EOF'
+
+AVISO: o supervisor de serviços (runsvdir) não reconheceu o serviço a
+tempo. Isso costuma acontecer na primeira instalação do termux-services.
+
+Feche o Termux completamente (não só minimize, encerre o app de verdade),
+abra de novo, e rode:
+
+    sv-enable adguardhome
+    sv up adguardhome
+
+EOF
+else
+  echo "==> Habilitando e iniciando o serviço..."
+  sv-enable adguardhome
+  sv up adguardhome
+fi
 
 IP="$(ip route get 1 2>/dev/null | awk '{print $7; exit}' || echo 'SEU_IP_LOCAL')"
 
