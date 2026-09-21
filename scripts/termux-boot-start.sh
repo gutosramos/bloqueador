@@ -11,5 +11,12 @@
 termux-wake-lock
 
 # Garante que o supervisor de serviços (runsvdir) está de pé
+export SVDIR="$PREFIX/var/service"
+export LOGDIR="$PREFIX/var/log"
+if ! pgrep -f "runsvdir $SVDIR" >/dev/null 2>&1; then
+  "$PREFIX/bin/service-daemon" start || true
+  sleep 2
+fi
+
 sv-enable adguardhome 2>/dev/null || true
 sv up adguardhome

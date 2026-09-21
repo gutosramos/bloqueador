@@ -5,10 +5,18 @@
 #
 # Uso:
 #   bash install-adguardhome.sh
+#
+# Por que via proot-distro (Debian)?
+# O binário oficial do AdGuard Home para Linux não é compilado como PIE.
+# A partir do Android 10, o sistema recusa executar esse tipo de binário
+# diretamente dentro do Termux (erro "unexpected e_type: 2"). A forma
+# suportada de contornar isso é rodá-lo dentro de um ambiente Debian
+# via proot-distro, que emula um Linux completo e não tem essa restrição.
 
 set -euo pipefail
 
-INSTALL_DIR="$HOME/AdGuardHome"
+DISTRO="debian"
+CONTAINER_DIR="/root/AdGuardHome"
 SERVICE_DIR="$PREFIX/var/service/adguardhome"
 
 echo "==> Detectando arquitetura do celular..."
@@ -27,24 +35,33 @@ case "$ARCH_RAW" in
 esac
 echo "    Arquitetura: $ARCH_RAW -> pacote linux_$ARCH"
 
-echo "==> Instalando pacotes necessários (curl, tar, termux-services)..."
+echo "==> Instalando pacotes necessários (proot-distro, termux-services)..."
 pkg update -y
-pkg install -y curl tar termux-services termux-api
+pkg install -y proot-distro termux-services termux-api
 
-if [ -d "$INSTALL_DIR" ]; then
-  echo "==> $INSTALL_DIR já existe, pulando download (apague a pasta para reinstalar)."
+echo "==> Instalando ambiente Debian via proot-distro..."
+echo "    (só baixa na primeira vez, ~300-500MB, pode demorar num celular antigo)"
+if proot-distro list -q 2>/dev/null | grep -qx "$DISTRO"; then
+  echo "    Debian já instalado, pulando."
 else
-  URL="https://github.com/AdguardTeam/AdGuardHome/releases/latest/download/AdGuardHome_linux_${ARCH}.tar.gz"
-  echo "==> Baixando AdGuard Home de:"
-  echo "    $URL"
-  TMP_TAR="$HOME/AdGuardHome.tar.gz"
-  curl -fL --retry 3 -o "$TMP_TAR" "$URL"
-
-  echo "==> Extraindo em $HOME..."
-  tar -xzf "$TMP_TAR" -C "$HOME"
-  rm -f "$TMP_TAR"
-  chmod +x "$INSTALL_DIR/AdGuardHome"
+  proot-distro install "$DISTRO"
 fi
+
+echo "==> Baixando e instalando o AdGuard Home dentro do Debian..."
+URL="https://github.com/AdguardTeam/AdGuardHome/releases/latest/download/AdGuardHome_linux_${ARCH}.tar.gz"
+proot-distro login "$DISTRO" -- sh -c "
+  set -e
+  if [ -x '$CONTAINER_DIR/AdGuardHome' ]; then
+    echo '    $CONTAINER_DIR já existe, pulando download (apague a pasta dentro do Debian para reinstalar).'
+  else
+    apt-get update -qq
+    apt-get install -y -qq curl ca-certificates
+    curl -fL --retry 3 -o /root/AdGuardHome.tar.gz '$URL'
+    tar -xzf /root/AdGuardHome.tar.gz -C /root
+    rm -f /root/AdGuardHome.tar.gz
+    chmod +x '$CONTAINER_DIR/AdGuardHome'
+  fi
+"
 
 echo "==> Garantindo que o supervisor de serviços (runsvdir) está ativo..."
 export SVDIR="$PREFIX/var/service"
@@ -60,17 +77,16 @@ mkdir -p "$SERVICE_DIR/log"
 cat > "$SERVICE_DIR/run" <<EOF
 #!/data/data/com.termux/files/usr/bin/sh
 exec 2>&1
-cd "$INSTALL_DIR"
-exec ./AdGuardHome --no-check-update -w "$INSTALL_DIR"
+exec proot-distro login $DISTRO -- $CONTAINER_DIR/AdGuardHome --no-check-update -w $CONTAINER_DIR
 EOF
 chmod +x "$SERVICE_DIR/run"
 
+mkdir -p "$HOME/AdGuardHome-logs"
 cat > "$SERVICE_DIR/log/run" <<EOF
 #!/data/data/com.termux/files/usr/bin/sh
-exec svlogd -tt "$INSTALL_DIR/logs"
+exec svlogd -tt "$HOME/AdGuardHome-logs"
 EOF
 chmod +x "$SERVICE_DIR/log/run"
-mkdir -p "$INSTALL_DIR/logs"
 
 echo "==> Aguardando o supervisor reconhecer o novo serviço..."
 for i in $(seq 1 15); do
@@ -109,6 +125,9 @@ cat <<EOF
    abra no navegador:
 
        http://$IP:3000
+
+   (pode demorar alguns segundos a mais que o normal pra responder
+   na primeira vez, por estar rodando dentro do ambiente Debian)
 
 2. Siga o assistente de configuração inicial:
      - Interface de admin: porta 3000 (pode manter)

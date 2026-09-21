@@ -2,7 +2,8 @@
 
 Transforma um celular Android antigo em um **servidor DNS bloqueador de anúncios**
 para toda a sua rede Wi-Fi, usando [AdGuard Home](https://adguard.com/en/adguard-home/overview.html)
-rodando dentro do [Termux](https://termux.dev/) — **sem precisar de root**.
+rodando dentro do [Termux](https://termux.dev/) (via um ambiente Debian
+gerenciado pelo `proot-distro`) — **sem precisar de root**.
 
 Depois de configurado, qualquer dispositivo conectado no seu Wi-Fi (celulares,
 TVs, notebooks, consoles) passa a ter anúncios e rastreadores bloqueados
@@ -25,8 +26,10 @@ simplesmente não resolve o endereço — o anúncio nunca chega a ser baixado.
 
 ## Requisitos
 
-- Um celular Android antigo (Android 7+ funciona bem; versões mais antigas
-  também costumam funcionar, mas com menos garantias).
+- Um celular Android antigo (Android 7+ funciona bem; a partir do Android 10
+  é obrigatório usar o ambiente Debian via `proot-distro` descrito abaixo).
+- Pelo menos ~1GB de espaço livre (o ambiente Debian usado para rodar o
+  AdGuard Home ocupa uns 300-500MB na primeira instalação).
 - Carregador para deixá-lo ligado permanentemente.
 - Wi-Fi doméstico com acesso às configurações do roteador (para trocar o DNS).
 - **Termux** instalado a partir da [F-Droid](https://f-droid.org/en/packages/com.termux/)
@@ -54,14 +57,17 @@ Abra o Termux no celular e rode:
 
 ```bash
 pkg install -y git
-git clone <url-deste-repositorio> bloqueador
+git clone https://github.com/gutosramos/bloqueador bloqueador
 cd bloqueador
 bash scripts/install-adguardhome.sh
 ```
 
-O script detecta a arquitetura do celular, baixa o AdGuard Home, e o
-configura como serviço (`termux-services`), para que reinicie sozinho se
-cair.
+O script detecta a arquitetura do celular, instala um ambiente Debian
+mínimo via `proot-distro` (necessário porque o Android moderno não deixa
+rodar o binário oficial do AdGuard Home diretamente no Termux — veja a
+nota no início do script se tiver curiosidade), baixa o AdGuard Home
+dentro desse ambiente, e o configura como serviço (`termux-services`),
+para que reinicie sozinho se cair.
 
 > Se você não quiser usar `git`, basta copiar o conteúdo de
 > `scripts/install-adguardhome.sh` para um arquivo no celular (ex: com o
@@ -153,6 +159,16 @@ IP do celular antigo.
 - **Reiniciar o serviço manualmente**:
   ```bash
   sv restart adguardhome
+  ```
+- **Ver os logs do AdGuard Home** (útil quando o serviço não sobe):
+  ```bash
+  cat ~/AdGuardHome-logs/current
+  ```
+- **Entrar no ambiente Debian manualmente** (para depurar por dentro,
+  ex: checar se o binário existe, testar rodar na mão, etc.):
+  ```bash
+  proot-distro login debian
+  cd /root/AdGuardHome && ./AdGuardHome --no-check-update -w /root/AdGuardHome
   ```
 
 ## Estrutura deste repositório
