@@ -147,10 +147,20 @@ void sendBlockedResponse(const uint8_t* query, int qEnd, IPAddress clientIP, uin
 }
 
 void forwardToUpstream(const uint8_t* query, int len, IPAddress clientIP, uint16_t clientPort) {
+  // Descarta qualquer pacote velho ainda pendente no buffer (de uma
+  // consulta anterior que demorou demais ou nunca foi lida) -- senao
+  // ele pode ser confundido com a resposta desta consulta.
+  int stale;
+  while ((stale = upstreamClient.parsePacket()) > 0) {
+    uint8_t trash[512];
+    upstreamClient.read(trash, min(stale, (int)sizeof(trash)));
+  }
+
   upstreamClient.beginPacket(UPSTREAM_DNS, 53);
   upstreamClient.write(query, len);
   upstreamClient.endPacket();
 
+  uint8_t queryId0 = query[0], queryId1 = query[1];
   unsigned long start = millis();
   while (millis() - start < UPSTREAM_TIMEOUT_MS) {
     int respLen = upstreamClient.parsePacket();
@@ -158,6 +168,12 @@ void forwardToUpstream(const uint8_t* query, int len, IPAddress clientIP, uint16
       uint8_t resp[512];
       if (respLen > (int)sizeof(resp)) respLen = sizeof(resp);
       upstreamClient.read(resp, respLen);
+      // Ignora respostas cujo ID nao bate com o desta consulta (pode
+      // ser resposta atrasada de uma consulta anterior) e continua
+      // esperando a resposta certa ate estourar o timeout.
+      if (respLen < 2 || resp[0] != queryId0 || resp[1] != queryId1) {
+        continue;
+      }
       dnsServer.beginPacket(clientIP, clientPort);
       dnsServer.write(resp, respLen);
       dnsServer.endPacket();
