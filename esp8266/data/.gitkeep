@@ -1,0 +1,2 @@
+Coloque aqui o blocklist.bin gerado por ../tools/gen_blocklist.py antes
+de fazer o upload do filesystem (LittleFS) para o ESP8266.

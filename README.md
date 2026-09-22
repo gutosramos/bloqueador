@@ -1,13 +1,43 @@
-# Bloqueador de Anúncios com Celular Antigo
+# Bloqueador de Anúncios
 
-Transforma um celular Android antigo em um **servidor DNS bloqueador de anúncios**
-para toda a sua rede Wi-Fi, usando [AdGuard Home](https://adguard.com/en/adguard-home/overview.html)
-rodando dentro do [Termux](https://termux.dev/) (via um ambiente Debian
-gerenciado pelo `proot-distro`) — **sem precisar de root**.
+Transforma um dispositivo que você já tem em um **servidor DNS bloqueador de
+anúncios** pra toda a sua rede Wi-Fi. Depois de configurado, qualquer
+dispositivo conectado no seu Wi-Fi (celulares, TVs, notebooks, consoles)
+passa a ter anúncios e rastreadores bloqueados automaticamente, sem
+instalar nada neles.
 
-Depois de configurado, qualquer dispositivo conectado no seu Wi-Fi (celulares,
-TVs, notebooks, consoles) passa a ter anúncios e rastreadores bloqueados
-automaticamente, sem instalar nada neles.
+Duas formas de fazer isso, neste repositório:
+
+- **[ESP8266](esp8266/)** (recomendado) — um microcontrolador tipo Wemos/Lolin
+  D1 Mini rodando um DNS sinkhole próprio. Sem sistema operacional, sem
+  restrição de porta, sem precisar de root — a porta 53 simplesmente funciona.
+  Custa poucos reais e consome pouquíssima energia.
+- **[Celular Android antigo](#celular-android-antigo-termux)** — usa
+  [AdGuard Home](https://adguard.com/en/adguard-home/overview.html) rodando
+  dentro do [Termux](https://termux.dev/). **Importante:** isso só funciona
+  em Android relativamente antigo/permissivo — a partir do Android 10+ (e
+  principalmente em aparelhos mais novos com mais "hardening", como
+  Samsung recentes), o próprio Android bloqueia a porta 53 pra apps sem
+  root, e não existe contorno sem root pra isso. Veja os detalhes na seção
+  correspondente antes de tentar essa via.
+
+## Celular Android antigo (Termux)
+
+> ⚠️ **Leia antes de começar:** a partir do Android 10 (e especialmente em
+> aparelhos mais recentes/com mais "hardening" de fabricante, como Samsung
+> em versões recentes), o próprio sistema **bloqueia apps sem root de
+> escutar na porta 53** (a porta padrão de DNS) — e não existe truque
+> (proot, containers, etc.) que contorne isso de verdade, porque a
+> restrição é aplicada pelo kernel real do aparelho. Testamos isso a fundo
+> num Samsung Galaxy A54 (Android 16): sem root, o AdGuard Home nunca
+> consegue abrir a porta 53 pra rede. Com root, também não rolou nesse
+> caso, porque a Samsung removeu a opção de desbloqueio de bootloader a
+> partir do One UI 8/Android 16, sem contorno confiável. Se seu celular é
+> relativamente novo, tem grande chance de bater nesse mesmo problema —
+> nesse caso, use o **[ESP8266](esp8266/)** em vez disso. Esse caminho aqui
+> só é recomendado se você tem certeza que seu Android é antigo o
+> suficiente pra não ter essa restrição (o jeito mais confiável de saber é
+> tentar e ver se a porta 53 abre).
 
 ## Como funciona
 
@@ -175,8 +205,13 @@ IP do celular antigo.
 
 ```
 .
-├── README.md                       # este guia
-└── scripts/
-    ├── install-adguardhome.sh      # instala e configura o AdGuard Home no Termux
-    └── termux-boot-start.sh        # script de auto-início (copiar p/ ~/.termux/boot/)
+├── README.md                       # este guia (celular/Termux)
+├── scripts/
+│   ├── install-adguardhome.sh      # instala e configura o AdGuard Home no Termux
+│   └── termux-boot-start.sh        # script de auto-início (copiar p/ ~/.termux/boot/)
+└── esp8266/                        # alternativa recomendada: DNS sinkhole em ESP8266
+    ├── README.md                   # guia de instalação do ESP8266
+    ├── bloqueador_esp8266.ino      # sketch Arduino
+    ├── tools/gen_blocklist.py      # gera a lista de bloqueio (blocklist.bin)
+    └── data/                       # onde fica o blocklist.bin antes do upload
 ```
