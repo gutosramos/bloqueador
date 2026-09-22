@@ -17,19 +17,13 @@
 #include <ESP8266WebServer.h>
 #include <WiFiUdp.h>
 #include <LittleFS.h>
+#include "secrets.h" // copie secrets.h.example -> secrets.h e preencha
 
-// ==================== CONFIGURACAO — AJUSTE AQUI ====================
+// ==================== CONFIGURACAO — AJUSTE EM secrets.h ====================
 
-const char* WIFI_SSID     = "SUA_REDE_WIFI";
-const char* WIFI_PASSWORD = "SUA_SENHA_WIFI";
-
-// IP fixo do proprio bloqueador dentro da sua rede.
-// Ajuste pra faixa da sua rede (ex: se seu roteador e 192.168.1.1, use
-// algo como 192.168.1.53). Escolha um IP fora da faixa de DHCP do
-// roteador pra nao correr risco de conflito.
-IPAddress LOCAL_IP(192, 168, 0, 53);
-IPAddress GATEWAY(192, 168, 0, 1);
-IPAddress SUBNET(255, 255, 255, 0);
+IPAddress LOCAL_IP(LOCAL_IP_A, LOCAL_IP_B, LOCAL_IP_C, LOCAL_IP_D);
+IPAddress GATEWAY(GATEWAY_A, GATEWAY_B, GATEWAY_C, GATEWAY_D);
+IPAddress SUBNET(SUBNET_A, SUBNET_B, SUBNET_C, SUBNET_D);
 
 // DNS "de verdade" pra onde mandamos tudo que nao esta bloqueado.
 IPAddress UPSTREAM_DNS(1, 1, 1, 1); // Cloudflare; troque por 8.8.8.8 (Google) se preferir
@@ -210,9 +204,18 @@ void setup() {
   WiFi.config(LOCAL_IP, GATEWAY, SUBNET);
   WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
   Serial.print("Conectando ao Wi-Fi");
+
+  unsigned long wifiStart = millis();
   while (WiFi.status() != WL_CONNECTED) {
     delay(500);
     Serial.print(".");
+    // Depois de 30s sem conectar, reinicia o ESP e tenta de novo do zero
+    // (em vez de ficar preso pra sempre -- util se o roteador reiniciar
+    // ou o sinal cair momentaneamente durante o boot).
+    if (millis() - wifiStart > 30000) {
+      Serial.println("\nNao conectou em 30s, reiniciando...");
+      ESP.restart();
+    }
   }
   Serial.println();
   Serial.print("Conectado! IP: ");
@@ -228,6 +231,16 @@ void setup() {
 }
 
 void loop() {
+  // Se cair o Wi-Fi em algum momento, reinicia sozinho depois de 30s
+  // desconectado em vez de ficar servindo DNS sem rede.
+  static unsigned long disconnectedSince = 0;
+  if (WiFi.status() != WL_CONNECTED) {
+    if (disconnectedSince == 0) disconnectedSince = millis();
+    else if (millis() - disconnectedSince > 30000) ESP.restart();
+  } else {
+    disconnectedSince = 0;
+  }
+
   webServer.handleClient();
 
   int len = dnsServer.parsePacket();

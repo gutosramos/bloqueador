@@ -211,7 +211,10 @@ IP do celular antigo.
 │   └── termux-boot-start.sh        # script de auto-início (copiar p/ ~/.termux/boot/)
 └── esp8266/                        # alternativa recomendada: DNS sinkhole em ESP8266
     ├── README.md                   # guia de instalação do ESP8266
-    ├── bloqueador_esp8266.ino      # sketch Arduino
+    ├── platformio.ini              # configuração do PlatformIO
+    ├── src/
+    │   ├── bloqueador_esp8266.ino  # sketch principal
+    │   └── secrets.h.example       # copie para secrets.h e preencha (fora do git)
     ├── tools/gen_blocklist.py      # gera a lista de bloqueio (blocklist.bin)
     └── data/                       # onde fica o blocklist.bin antes do upload
 ```

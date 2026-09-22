@@ -1,1 +1,4 @@
 __pycache__/
+.pio/
+data/blocklist.bin
+src/secrets.h
